@@ -141,7 +141,6 @@ const char* loginPage = R"rawliteral(
             top: 50%;
             transform: translateY(-50%);
             cursor: pointer;
-            font-size: 18px;
         }
         label {
             margin: 10px 0;
@@ -156,6 +155,14 @@ const char* loginPage = R"rawliteral(
             text-align: center;
             display: none;
         }
+        button:focus,
+        div:focus,
+        a:focus {
+          outline: none;
+        }
+        button, div, a {
+          -webkit-tap-highlight-color: transparent;
+        }
     </style>
 </head>
 <body>
@@ -164,7 +171,7 @@ const char* loginPage = R"rawliteral(
     <form id="loginForm" method="POST" action="/login">
         <div class="password-container">
             <input type="password" name="password" id="passInput" placeholder="Password" required>
-            <span id="togglePassword">👁️</span>
+            <span id="togglePassword"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
         </div>
         <label>
             <input type="checkbox" name="remember"> Keep me logged in
@@ -180,10 +187,10 @@ const char* loginPage = R"rawliteral(
             var pass = document.getElementById('passInput');
             if (pass.type === 'password') {
                 pass.type = 'text';
-                this.innerHTML = '🙈';
+                this.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.92 19.92 0 0 1 5.06-5.94"/><path d="M1 1l22 22"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/></svg>';
             } else {
                 pass.type = 'password';
-                this.innerHTML = '👁️';
+                this.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
             }
         });
     </script>
@@ -347,7 +354,6 @@ const char* controlPage = R"rawliteral(
             top: 50%;
             transform: translateY(-50%);
             cursor: pointer;
-            font-size: 18px;
         }
         .pass-toggle {
             position: absolute;
@@ -355,7 +361,6 @@ const char* controlPage = R"rawliteral(
             top: 50%;
             transform: translateY(-50%);
             cursor: pointer;
-            font-size: 18px;
         }
         .edit-pen {
             display: none;
@@ -400,6 +405,14 @@ const char* controlPage = R"rawliteral(
         #sidebar-spacer {
             flex-grow: 1;
         }
+        button:focus,
+        div:focus,
+        a:focus {
+          outline: none;
+        }
+        button, div, a {
+          -webkit-tap-highlight-color: transparent;
+        }
     </style>
 </head>
 <body>
@@ -412,7 +425,7 @@ const char* controlPage = R"rawliteral(
                 <input type="text" name="ssid" placeholder="WiFi SSID" required>
                 <div class="password-container">
                     <input type="password" id="password" name="password" placeholder="WiFi Password">
-                    <span id="togglePassword">👁️</span>
+                    <span id="togglePassword"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
                 </div>
                 <input type="text" name="staticIP" placeholder="Static IP (e.g., 192.168.1.100, optional)">
                 <button type="submit">Save & Reboot</button>
@@ -423,11 +436,11 @@ const char* controlPage = R"rawliteral(
             <form action="/save_login" method="POST">
                 <div class="password-container">
                     <input type="password" name="currentPass" placeholder="Enter Current Password" required>
-                    <span class="pass-toggle" onclick="toggleThisPass(this)">👁️</span>
+                    <span class="pass-toggle" onclick="toggleThisPass(this)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
                 </div>
                 <div class="password-container">
                     <input type="password" name="newPass" placeholder="New Login Password" required>
-                    <span class="pass-toggle" onclick="toggleThisPass(this)">👁️</span>
+                    <span class="pass-toggle" onclick="toggleThisPass(this)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
                 </div>
                 <button type="submit">Save</button>
             </form>
@@ -635,10 +648,10 @@ const char* controlPage = R"rawliteral(
         let input = span.parentElement.querySelector('input');
         if (input.type === 'password') {
             input.type = 'text';
-            span.innerHTML = '🙈';
+            span.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.92 19.92 0 0 1 5.06-5.94"/><path d="M1 1l22 22"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/></svg>';
         } else {
             input.type = 'password';
-            span.innerHTML = '👁️';
+            span.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
         }
     }
 
@@ -661,10 +674,10 @@ const char* controlPage = R"rawliteral(
         var password = document.getElementById('password');
         if (password.type === 'password') {
             password.type = 'text';
-            this.innerHTML = '👁️';
+            this.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.92 19.92 0 0 1 5.06-5.94"/><path d="M1 1l22 22"/><path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/></svg>';
         } else {
             password.type = 'password';
-            this.innerHTML = '🙈';
+            this.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
         }
     });
 
@@ -749,6 +762,14 @@ const char* connectPage = R"rawliteral(
         }
         h1 { color: #0096FF; }
         p { font-size: 18px; }
+        button:focus,
+        div:focus,
+        a:focus {
+          outline: none;
+        }
+        button, div, a {
+          -webkit-tap-highlight-color: transparent;
+        }
     </style>
 </head>
 <body>
