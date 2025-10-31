@@ -2,7 +2,6 @@
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
 #include <EEPROM.h>
-
 // Pin definitions
 const int lightPin = 12;  // D6
 const int fanPin = 13;    // D7
@@ -10,44 +9,36 @@ const int motorPin = 15;  // D8
 const int light2Pin = 14; // D5
 const int ledPin = 2;     // Built-in LED (active LOW: LOW to light up)
 const int resetPin = 0;   // D3 (GPIO0) for reset button (connect button to GND, internal pullup)
-
 // Switch input pins
 const int lightSwitchPin = 5;   // D1
 const int fanSwitchPin = 4;     // D2
 const int motorSwitchPin = 1;   // TX (GPIO1)
 const int light2SwitchPin = 3;  // RX (GPIO3)
-
 // LED defines
 #define LED_ON LOW
 #define LED_OFF HIGH
-
 // Debounce
 const unsigned long debounceDelay = 50;
-
 // Switch debounce variables for light
 int lastLightReading = HIGH;
 unsigned long lastLightDebounceTime = 0;
 int lightSwitchState = HIGH;
 bool lastLightStable = HIGH;
-
 // Switch debounce variables for fan
 int lastFanReading = HIGH;
 unsigned long lastFanDebounceTime = 0;
 int fanSwitchState = HIGH;
 bool lastFanStable = HIGH;
-
 // Switch debounce variables for motor
 int lastMotorReading = HIGH;
 unsigned long lastMotorDebounceTime = 0;
 int motorSwitchState = HIGH;
 bool lastMotorStable = HIGH;
-
 // Switch debounce variables for light2
 int lastLight2Reading = HIGH;
 unsigned long lastLight2DebounceTime = 0;
 int light2SwitchState = HIGH;
 bool lastLight2Stable = HIGH;
-
 // EEPROM settings
 #define EEPROM_SIZE 512
 #define CONFIG_ADDR 0
@@ -61,38 +52,30 @@ struct Config {
 };
 Config config;
 const int STATES_ADDR = sizeof(Config);
-
 // Server and DNS
 ESP8266WebServer server(80);
 DNSServer dnsServer;
-
 // WiFi settings
 const char* apSSID = "HomeSetup";
 IPAddress apIP(192, 168, 4, 1);
-
 // Blink timing for non-connected states
 unsigned long lastBlink = 0;
 int blinkInterval = 3000;  // Default 3s for disconnected
 bool ledState = false;
-
 // Pulse timing for connected state
 unsigned long ledTimer = 0;
 int ledPhase = 0;  // 0: off (10s), 1: on (0.5s)
-
 // Connection state
 bool isConnected = false;
 bool isAPMode = false;
 int connectAttempts = 0;
 const int maxConnectAttempts = 20;  // ~10 min at 30s intervals
-
 // Reset button timing
 unsigned long pressStart = 0;
 const unsigned long resetHoldTime = 3000;  // 3 seconds
-
 // HTML and CSS (hardcoded for simplicity, no SPIFFS needed)
 const char* controlPage = R"rawliteral(
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -160,6 +143,7 @@ const char* controlPage = R"rawliteral(
             border-radius: 5px; 
             background-color: #333; 
             color: #fff; 
+            box-sizing: border-box;
         }
         button[type="submit"] { 
             background-color: #00ff00; 
@@ -215,6 +199,8 @@ const char* controlPage = R"rawliteral(
             padding: 60px 20px 20px 20px;
             box-sizing: border-box;
             z-index: 1;
+            display: flex;
+            flex-direction: column;
         }
         #sidebar h2 {
             color: #00ff00;
@@ -238,6 +224,9 @@ const char* controlPage = R"rawliteral(
         }
         .edit-pen {
             display: none;
+            font-size: 20px;
+            margin-left: 10px;
+            cursor: pointer;
         }
         body.edit-mode .edit-pen {
             display: inline;
@@ -273,6 +262,9 @@ const char* controlPage = R"rawliteral(
             background: #ff0000;
             color: #fff;
         }
+        #sidebar-spacer {
+            flex-grow: 1;
+        }
     </style>
 </head>
 <body>
@@ -291,262 +283,266 @@ const char* controlPage = R"rawliteral(
                 <button type="submit">Save & Reboot</button>
             </form>
         </div>
+        <div id="sidebar-spacer"></div>
         <button class="reset-btn" onclick="resetConfig()">Factory Reset</button>
     </div>
     <h1>Quickstart Device</h1>
     
-    <div class="toggle">
-        <label>Light</label>
-        <button class="toggle-btn off" id="lightBtn" onclick="toggle('light')">
-            <span class="icon">💡</span> OFF
-        </button>
-    </div>
-    
-    <div class="toggle">
-        <label>Light-2</label>
-        <button class="toggle-btn off" id="light2Btn" onclick="toggle('light2')">
-            <span class="icon">💡</span> OFF
-        </button>
-    </div>
-    
-    <div class="toggle">
-        <label>Fan</label>
-        <button class="toggle-btn off" id="fanBtn" onclick="toggle('fan')">
-            <span class="icon">🌀</span> OFF
-        </button>
-    </div>
-    
-    <div class="toggle">
-        <label>Motor</label>
-        <button class="toggle-btn off" id="motorBtn" onclick="toggle('motor')">
-            <span class="icon">⚙️</span> OFF
-        </button>
-    </div>
-    
-    <div id="status" class="status offline">Device is offline</div>
+<div class="toggle">
+    <label>Light</label>
+    <button class="toggle-btn off" id="lightBtn" onclick="toggle('light')">
+        <span class="icon"></span> OFF
+    </button>
+</div>
 
-    <div id="editModal">
-        <h3>Edit Device</h3>
-        <input id="newName" placeholder="Rename Title">
-        <input id="newIcon" placeholder="Change icon (emoji)">
-        <button id="saveBtn" onclick="saveEdit()">Save</button>
-        <button id="cancelBtn" onclick="cancelEdit()">Cancel</button>
-    </div>
+<div class="toggle">
+    <label>Light-2</label>
+    <button class="toggle-btn off" id="light2Btn" onclick="toggle('light2')">
+        <span class="icon"></span> OFF
+    </button>
+</div>
 
-    <script>
-        let customs = [];
-        let currentIdx = -1;
-        let isEditMode = false;
-        let pressTimer;
+<div class="toggle">
+    <label>Fan</label>
+    <button class="toggle-btn off" id="fanBtn" onclick="toggle('fan')">
+        <span class="icon"></span> OFF
+    </button>
+</div>
 
-        function loadCustoms() {
-            fetch('/get_custom')
-                .then(response => response.json())
-                .then(data => {
-                    customs = data;
-                    updateLabelsAndButtons();
-                    addPens();
-                });
-        }
+<div class="toggle">
+    <label>Motor</label>
+    <button class="toggle-btn off" id="motorBtn" onclick="toggle('motor')">
+        <span class="icon"></span> OFF
+    </button>
+</div>
 
-        function updateLabelsAndButtons() {
-            const pins = ['light', 'light2', 'fan', 'motor'];
-            const labels = document.querySelectorAll('.toggle label');
-            pins.forEach((pin, idx) => {
-                labels[idx].firstChild.textContent = customs[idx].name; // text node
-                const btn = document.getElementById(pin + 'Btn');
-                const state = btn.classList.contains('on') ? 'ON' : 'OFF';
-                btn.innerHTML = '<span class="icon">' + customs[idx].icon + '</span> ' + state;
+<div id="status" class="status offline">Device is offline</div>
+
+<div id="editModal">
+    <h3>Edit Device</h3>
+    <input id="newName" placeholder="Rename Title">
+    <input id="newIcon" placeholder="Change icon (emoji)">
+    <button id="saveBtn" onclick="saveEdit()">Save</button>
+    <button id="cancelBtn" onclick="cancelEdit()">Cancel</button>
+</div>
+
+<script>
+    let customs = [];
+    let currentIdx = -1;
+    let isEditMode = false;
+    let pressTimer;
+
+    function loadCustoms() {
+        fetch('/get_custom')
+            .then(response => response.json())
+            .then(data => {
+                customs = data;
+                updateLabelsAndButtons();
+                addPens();
             });
-        }
+    }
 
-        function addPens() {
-            const labels = document.querySelectorAll('.toggle label');
-            labels.forEach((lab, idx) => {
-                if (!lab.querySelector('.edit-pen')) {
-                    const textNode = lab.firstChild;
-                    lab.innerHTML = ''; // clear
-                    lab.appendChild(textNode);
-                    let pen = document.createElement('span');
-                    pen.className = 'edit-pen';
-                    pen.innerHTML = '✏️';
-                    pen.style.marginLeft = '10px';
-                    pen.style.cursor = 'pointer';
-                    pen.onclick = () => editDevice(idx);
-                    lab.appendChild(pen);
-                }
+    function updateLabelsAndButtons() {
+        const pins = ['light', 'light2', 'fan', 'motor'];
+        const labels = document.querySelectorAll('.toggle label');
+        pins.forEach((pin, idx) => {
+            if (labels[idx].firstChild.nodeType === Node.TEXT_NODE) {
+                labels[idx].firstChild.textContent = customs[idx].name;
+            }
+            const btn = document.getElementById(pin + 'Btn');
+            const state = btn.classList.contains('on') ? 'ON' : 'OFF';
+            btn.innerHTML = '<span class="icon">' + customs[idx].icon + '</span> ' + state;
+        });
+    }
+
+    function addPens() {
+        const labels = document.querySelectorAll('.toggle label');
+        const pins = ['light', 'light2', 'fan', 'motor'];
+        labels.forEach((lab, idx) => {
+            if (!lab.querySelector('.edit-pen')) {
+                const textNode = document.createTextNode(customs[idx].name || pins[idx].charAt(0).toUpperCase() + pins[idx].slice(1));
+                lab.innerHTML = ''; // clear
+                lab.appendChild(textNode);
+                let pen = document.createElement('span');
+                pen.className = 'edit-pen';
+                pen.innerHTML = '✏️';
+                pen.onclick = () => editDevice(idx);
+                lab.appendChild(pen);
+            }
+        });
+    }
+
+    function editDevice(idx) {
+        currentIdx = idx;
+        document.getElementById('newName').value = customs[idx].name;
+        document.getElementById('newIcon').value = customs[idx].icon;
+        document.getElementById('editModal').style.display = 'block';
+    }
+
+    function saveEdit() {
+        const newName = document.getElementById('newName').value;
+        const newIcon = document.getElementById('newIcon').value;
+        fetch(`/save_device?idx=${currentIdx}&name=${encodeURIComponent(newName)}&icon=${encodeURIComponent(newIcon)}`)
+            .then(() => {
+                customs[currentIdx].name = newName;
+                customs[currentIdx].icon = newIcon;
+                updateLabelsAndButtons();
+                cancelEdit();
             });
-        }
+    }
 
-        function editDevice(idx) {
-            currentIdx = idx;
-            document.getElementById('newName').value = customs[idx].name;
-            document.getElementById('newIcon').value = customs[idx].icon;
-            document.getElementById('editModal').style.display = 'block';
-        }
+    function cancelEdit() {
+        document.getElementById('editModal').style.display = 'none';
+    }
 
-        function saveEdit() {
-            const newName = document.getElementById('newName').value;
-            const newIcon = document.getElementById('newIcon').value;
-            fetch(`/save_device?idx=${currentIdx}&name=${encodeURIComponent(newName)}&icon=${encodeURIComponent(newIcon)}`)
-                .then(() => {
-                    customs[currentIdx].name = newName;
-                    customs[currentIdx].icon = newIcon;
-                    updateLabelsAndButtons();
-                    cancelEdit();
-                });
-        }
-
-        function cancelEdit() {
-            document.getElementById('editModal').style.display = 'none';
-        }
-
-        function updateStatus() {
-            fetch('/status')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('status').innerHTML = data.connected ? 'Device is online' : 'Device is offline';
-                    document.getElementById('status').className = 'status ' + (data.connected ? 'online' : 'offline');
-                    document.getElementById('menuBtn').style.display = 'block';
-                    if (data.connected) {
-                        document.getElementById('wifiBtn').style.display = 'block';
-                        var sidebar = document.getElementById('sidebar');
-                        if (sidebar.style.left !== '0px') {
-                            document.getElementById('wifiConfigForm').style.display = 'none';
-                        }
-                    } else {
-                        document.getElementById('wifiConfigForm').style.display = 'block';
-                        document.getElementById('wifiBtn').style.display = 'none';
+    function updateStatus() {
+        fetch('/status')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('status').innerHTML = data.connected ? 'Device is online' : 'Device is offline';
+                document.getElementById('status').className = 'status ' + (data.connected ? 'online' : 'offline');
+                document.getElementById('menuBtn').style.display = 'block';
+                if (data.connected) {
+                    document.getElementById('wifiBtn').style.display = 'block';
+                    var sidebar = document.getElementById('sidebar');
+                    if (sidebar.style.left !== '0px') {
+                        document.getElementById('wifiConfigForm').style.display = 'none';
                     }
-                    // Update toggles
-                    const pins = ['light', 'light2', 'fan', 'motor'];
-                    pins.forEach((pin, idx) => {
-                        const btn = document.getElementById(pin + 'Btn');
-                        const state = data[pin];
-                        btn.innerHTML = '<span class="icon">' + (customs[idx] ? customs[idx].icon : getDefaultIcon(pin)) + '</span> ' + (state ? 'ON' : 'OFF');
-                        btn.className = 'toggle-btn ' + (state ? 'on' : 'off');
-                    });
-                });
-        }
-        
-        function getDefaultIcon(pin) {
-            if (pin === 'light' || pin === 'light2') return '💡';
-            if (pin === 'fan') return '🌀';
-            if (pin === 'motor') return '⚙️';
-            return '';
-        }
-        
-        function toggle(pin) {
-            const currentState = document.getElementById(pin + 'Btn').classList.contains('on');
-            const newState = !currentState ? 1 : 0;
-            fetch('/set?pin=' + pin + '&state=' + newState)
-                .then(() => updateStatus());
-        }
-        
-        function resetConfig() {
-            if (confirm('Are you sure? This will clear WiFi settings and reboot.')) {
-                fetch('/clear')
-                    .then(() => location.reload());
-            }
-        }
-        
-        function toggleWifiConfig() {
-            let form = document.getElementById('wifiConfigForm');
-            if (form.style.display === 'none' || form.style.display === '') {
-                form.style.display = 'block';
-                fetch('/get_config')
-                    .then(response => response.json())
-                    .then(data => {
-                        document.querySelector('#wifiConfigForm input[name="ssid"]').value = data.ssid;
-                        document.querySelector('#wifiConfigForm input[name="staticIP"]').value = data.staticIP;
-                    });
-            } else {
-                form.style.display = 'none';
-            }
-        }
-        
-        document.getElementById('menuBtn').addEventListener('click', function() {
-            var sidebar = document.getElementById('sidebar');
-            if (sidebar.style.left === '0px') {
-                sidebar.style.left = '-250px';
-            } else {
-                sidebar.style.left = '0px';
-            }
-        });
-        
-        document.getElementById('togglePassword').addEventListener('click', function() {
-            var password = document.getElementById('password');
-            if (password.type === 'password') {
-                password.type = 'text';
-                this.innerHTML = '🙈';
-            } else {
-                password.type = 'password';
-                this.innerHTML = '👁️';
-            }
-        });
-
-        // Long press detection
-        document.body.addEventListener('mousedown', function(e) {
-            if (e.target === document.body) {
-                pressTimer = window.setTimeout(toggleEditMode, 3000);
-            }
-        });
-
-        document.body.addEventListener('mouseup', function() {
-            clearTimeout(pressTimer);
-        });
-
-        document.body.addEventListener('touchstart', function(e) {
-            if (e.target === document.body) {
-                pressTimer = window.setTimeout(toggleEditMode, 3000);
-            }
-        }, {passive: false});
-
-        document.body.addEventListener('touchend', function() {
-            clearTimeout(pressTimer);
-        });
-
-        function toggleEditMode() {
-            isEditMode = !isEditMode;
-            if (isEditMode) {
-                document.body.classList.add('edit-mode');
-                // Create and insert cancel button
-                let cancelBtn = document.createElement('button');
-                cancelBtn.id = 'cancelEditMode';
-                cancelBtn.textContent = 'Cancel';
-                cancelBtn.style.backgroundColor = '#ff0000';
-                cancelBtn.style.color = '#fff';
-                cancelBtn.style.padding = '10px';
-                cancelBtn.style.border = 'none';
-                cancelBtn.style.borderRadius = '5px';
-                cancelBtn.style.cursor = 'pointer';
-                cancelBtn.style.marginBottom = '10px';
-                cancelBtn.style.width = '200px';
-                cancelBtn.onclick = toggleEditMode;
-                let statusDiv = document.getElementById('status');
-                statusDiv.parentNode.insertBefore(cancelBtn, statusDiv);
-            } else {
-                document.body.classList.remove('edit-mode');
-                // Remove cancel button
-                let cancelBtn = document.getElementById('cancelEditMode');
-                if (cancelBtn) {
-                    cancelBtn.remove();
+                } else {
+                    document.getElementById('wifiBtn').style.display = 'block';
+                    var sidebar = document.getElementById('sidebar');
+                    if (sidebar.style.left !== '0px') {
+                        document.getElementById('wifiConfigForm').style.display = 'none';
+                    }
                 }
+                // Update toggles
+                const pins = ['light', 'light2', 'fan', 'motor'];
+                pins.forEach((pin, idx) => {
+                    const btn = document.getElementById(pin + 'Btn');
+                    const state = data[pin];
+                    btn.innerHTML = '<span class="icon">' + (customs[idx] ? customs[idx].icon : getDefaultIcon(pin)) + '</span> ' + (state ? 'ON' : 'OFF');
+                    btn.className = 'toggle-btn ' + (state ? 'on' : 'off');
+                });
+            });
+    }
+    
+    function getDefaultIcon(pin) {
+        if (pin === 'light' || pin === 'light2') return '💡';
+        if (pin === 'fan') return '🌀';
+        if (pin === 'motor') return '⚙️';
+        return '';
+    }
+    
+    function toggle(pin) {
+        const currentState = document.getElementById(pin + 'Btn').classList.contains('on');
+        const newState = !currentState ? 1 : 0;
+        fetch('/set?pin=' + pin + '&state=' + newState)
+            .then(() => updateStatus());
+    }
+    
+    function resetConfig() {
+        if (confirm('Are you sure? This will clear WiFi settings and reboot.')) {
+            fetch('/clear')
+                .then(() => location.reload());
+        }
+    }
+    
+    function toggleWifiConfig() {
+        let form = document.getElementById('wifiConfigForm');
+        if (form.style.display === 'none' || form.style.display === '') {
+            form.style.display = 'block';
+            fetch('/get_config')
+                .then(response => response.json())
+                .then(data => {
+                    document.querySelector('#wifiConfigForm input[name="ssid"]').value = data.ssid;
+                    document.querySelector('#wifiConfigForm input[name="staticIP"]').value = data.staticIP;
+                });
+        } else {
+            form.style.display = 'none';
+        }
+    }
+    
+    document.getElementById('menuBtn').addEventListener('click', function() {
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar.style.left === '0px') {
+            sidebar.style.left = '-250px';
+        } else {
+            sidebar.style.left = '0px';
+        }
+    });
+    
+    document.getElementById('togglePassword').addEventListener('click', function() {
+        var password = document.getElementById('password');
+        if (password.type === 'password') {
+            password.type = 'text';
+            this.innerHTML = '👁️';
+        } else {
+            password.type = 'password';
+            this.innerHTML = '🙈';
+        }
+    });
+
+    // Long press detection
+    document.body.addEventListener('mousedown', function(e) {
+        if (e.target === document.body) {
+            pressTimer = window.setTimeout(toggleEditMode, 2000);
+        }
+    });
+
+    document.body.addEventListener('mouseup', function() {
+        clearTimeout(pressTimer);
+    });
+
+    document.body.addEventListener('touchstart', function(e) {
+        if (e.target === document.body) {
+            pressTimer = window.setTimeout(toggleEditMode, 2000);
+        }
+    }, {passive: false});
+
+    document.body.addEventListener('touchend', function() {
+        clearTimeout(pressTimer);
+    });
+
+    function toggleEditMode() {
+        isEditMode = !isEditMode;
+        if (isEditMode) {
+            document.body.classList.add('edit-mode');
+            // Create and insert cancel button
+            let cancelBtn = document.createElement('button');
+            cancelBtn.id = 'cancelEditMode';
+            cancelBtn.textContent = 'Cancel Edit Mode';
+            cancelBtn.style.backgroundColor = '#ff0000';
+            cancelBtn.style.color = '#fff';
+            cancelBtn.style.padding = '10px';
+            cancelBtn.style.border = 'none';
+            cancelBtn.style.borderRadius = '5px';
+            cancelBtn.style.cursor = 'pointer';
+            cancelBtn.style.marginBottom = '10px';
+            cancelBtn.style.width = '200px';
+            cancelBtn.onclick = toggleEditMode;
+            let statusDiv = document.getElementById('status');
+            statusDiv.parentNode.insertBefore(cancelBtn, statusDiv);
+        } else {
+            document.body.classList.remove('edit-mode');
+            // Remove cancel button
+            let cancelBtn = document.getElementById('cancelEditMode');
+            if (cancelBtn) {
+                cancelBtn.remove();
             }
         }
-        
-        // Update on load and every 5s
-        updateStatus();
-        loadCustoms();
-        setInterval(updateStatus, 5000);
-    </script>
-</body>
+        updateLabelsAndButtons();
+    }
+    
+    // Update on load and every 5s
+    updateStatus();
+    loadCustoms();
+    setInterval(updateStatus, 5000);
+</script></body>
 </html>
 )rawliteral";
 
 const char* connectPage = R"rawliteral(
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -573,7 +569,8 @@ const char* connectPage = R"rawliteral(
     <h1>Connecting to WiFi...</h1>
     <p>Please wait while we connect to your network.</p>
     <div id="popup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#111; color:#fff; padding:20px; border-radius:10px; text-align:center; z-index:10;">
-        <p>Connected! Visit <a id="ipLink" href="#" style="color:#00ff00;" target="_blank"></a> to control the device.<br>AP will turn off automatically in 10 seconds.</p>
+        <p>Connected! Visit <a id="ipLink" href="#" style="color:#00ff00;" target="_blank"></a> to control the device.
+AP will turn off automatically in 10 seconds.</p>
     </div>
     <script>
         let interval = setInterval(() => {
@@ -593,21 +590,19 @@ const char* connectPage = R"rawliteral(
                 });
         }, 2000);
 
-        function finishSetup() {
-            fetch('/finish_setup')
-                .then(() => {
-                    alert('AP will stop now. Please connect to your home WiFi and visit the provided IP.');
-                });
-        }
-    </script>
-</body>
+    function finishSetup() {
+        fetch('/finish_setup')
+            .then(() => {
+                alert('AP will stop now. Please connect to your home WiFi and visit the provided IP.');
+            });
+    }
+</script></body>
 </html>
 )rawliteral";
 
 String toStringIp(IPAddress ip) {
   return String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
 }
-
 void setDefaults() {
   strcpy(config.deviceNames[0], "Light");
   strcpy(config.deviceNames[1], "Light-2");
@@ -618,7 +613,6 @@ void setDefaults() {
   strcpy(config.deviceIcons[2], "🌀");
   strcpy(config.deviceIcons[3], "⚙️");
 }
-
 void saveStates() {
   EEPROM.write(STATES_ADDR, digitalRead(lightPin));
   EEPROM.write(STATES_ADDR + 1, digitalRead(fanPin));
@@ -626,7 +620,6 @@ void saveStates() {
   EEPROM.write(STATES_ADDR + 3, digitalRead(light2Pin));
   EEPROM.commit();
 }
-
 void loadConfig() {
   EEPROM.get(CONFIG_ADDR, config);
   if (strlen(config.ssid) == 0 || !config.hasConfig) {
@@ -639,7 +632,6 @@ void loadConfig() {
     setDefaults();
   }
 }
-
 void saveConfig() {
   if (strlen(config.deviceNames[0]) == 0) {
     setDefaults();
@@ -648,12 +640,9 @@ void saveConfig() {
   EEPROM.commit();
   Serial.println("Config saved.");
 }
-
 void connectToWiFi() {
   WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  
-  if (strlen(config.staticIP) > 0) {
+  WiFi.disconnect();  if (strlen(config.staticIP) > 0) {
     IPAddress ip;
     ip.fromString(config.staticIP);
     IPAddress gateway(192, 168, 1, 1);  // Assume common home router
@@ -662,26 +651,18 @@ void connectToWiFi() {
     Serial.println("Static IP set: " + String(config.staticIP));
   } else {
     WiFi.config(0U, 0U, 0U);  // DHCP
-  }
-  
-  WiFi.begin(config.ssid, config.password);
+  }  WiFi.begin(config.ssid, config.password);
   connectAttempts = 0;
   isConnected = false;
   blinkInterval = 3000;  // Disconnected blink
 }
-
 void startAPMode() {
   isAPMode = true;
   isConnected = false;
-  blinkInterval = 500;  // Fast blink for AP
-  
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(apSSID);
-  dnsServer.start(53, "*", apIP);
-  
-  Serial.println("AP started. SSID: " + String(apSSID) + ", IP: " + WiFi.softAPIP().toString());
+  blinkInterval = 500;  // Fast blink for AP  WiFi.mode(WIFI_AP);
+  WiFi.softAP(apSSID, "11223344");
+  dnsServer.start(53, "*", apIP);  Serial.println("AP started. SSID: " + String(apSSID) + ", IP: " + WiFi.softAPIP().toString());
 }
-
 void clearConfigAndRestart() {
   config.hasConfig = false;
   strcpy(config.ssid, "");
@@ -697,11 +678,8 @@ void clearConfigAndRestart() {
   delay(1000);
   ESP.restart();
 }
-
 void handleResetButton() {
-  bool pressed = (digitalRead(resetPin) == LOW);
-  
-  if (pressed && pressStart == 0) {
+  bool pressed = (digitalRead(resetPin) == LOW);  if (pressed && pressStart == 0) {
     pressStart = millis();
     Serial.println("Reset button pressed...");
   } else if (!pressed && pressStart != 0) {
@@ -715,7 +693,6 @@ void handleResetButton() {
     pressStart = 0;
   }
 }
-
 void setupServer() {
   // Status endpoint
   server.on("/status", []() {
@@ -728,18 +705,14 @@ void setupServer() {
     json += "\"motor\":" + String(digitalRead(motorPin));
     json += "}";
     server.send(200, "application/json; charset=utf-8", json);
-  });
-  
-  // Get config endpoint (without password)
+  });  // Get config endpoint (without password)
   server.on("/get_config", []() {
     String json = "{";
     json += "\"ssid\":\"" + String(config.ssid) + "\",";
     json += "\"staticIP\":\"" + String(config.staticIP) + "\"";
     json += "}";
     server.send(200, "application/json; charset=utf-8", json);
-  });
-  
-  // Set endpoint
+  });  // Set endpoint
   server.on("/set", []() {
     if (server.hasArg("pin") && server.hasArg("state")) {
       String pin = server.arg("pin");
@@ -753,9 +726,7 @@ void setupServer() {
     } else {
       server.send(400, "text/plain; charset=utf-8", "Bad Request");
     }
-  });
-  
-  // Save config
+  });  // Save config
   server.on("/save", HTTP_POST, []() {
     if (server.hasArg("ssid")) {
       strncpy(config.ssid, server.arg("ssid").c_str(), 31);
@@ -787,22 +758,18 @@ void setupServer() {
     isConnected = false;
     blinkInterval = 3000;
     server.send(200, "text/html; charset=utf-8", connectPage);
-  });
-  
-  // Finish setup endpoint
+  }, []() {
+    // Handle file upload if needed, but not used here
+  });  // Finish setup endpoint
   server.on("/finish_setup", []() {
     server.send(200, "text/plain; charset=utf-8", "OK");
     WiFi.mode(WIFI_STA);
     isAPMode = false;
     dnsServer.stop();
-  });
-  
-  // Clear config (factory reset)
+  });  // Clear config (factory reset)
   server.on("/clear", []() {
     clearConfigAndRestart();
-  });
-  
-  // Get custom device names and icons
+  });  // Get custom device names and icons
   server.on("/get_custom", []() {
     String json = "[";
     for (int i = 0; i < 4; i++) {
@@ -811,9 +778,7 @@ void setupServer() {
     }
     json += "]";
     server.send(200, "application/json; charset=utf-8", json);
-  });
-
-  // Save device custom
+  });  // Save device custom
   server.on("/save_device", []() {
     if (server.hasArg("idx") && server.hasArg("name") && server.hasArg("icon")) {
       int idx = server.arg("idx").toInt();
@@ -830,14 +795,10 @@ void setupServer() {
     } else {
       server.send(400, "text/plain; charset=utf-8", "Bad Request");
     }
-  });
-  
-  // Root - control/setup page
+  });  // Root - control/setup page
   server.on("/", []() {
     server.send(200, "text/html; charset=utf-8", controlPage);
-  });
-  
-  // Captive portal redirects
+  });  // Captive portal redirects
   server.on("/generate_204", []() {  // Android
     server.sendHeader("Location", String("http://") + toStringIp(server.client().localIP()), true);
     server.send(302, "text/plain", "");
@@ -845,12 +806,9 @@ void setupServer() {
   server.on("/fwlink", []() {  // Microsoft
     server.sendHeader("Location", String("http://") + toStringIp(server.client().localIP()), true);
     server.send(302, "text/plain", "");
-  });
-  
-  server.begin();
+  });  server.begin();
   Serial.println("HTTP server started");
 }
-
 void handleSwitches() {
   // Light switch
   int reading = digitalRead(lightSwitchPin);
@@ -868,9 +826,7 @@ void handleSwitches() {
       }
     }
   }
-  lastLightReading = reading;
-  
-  // Fan switch
+  lastLightReading = reading;  // Fan switch
   reading = digitalRead(fanSwitchPin);
   if (reading != lastFanReading) {
     lastFanDebounceTime = millis();
@@ -886,9 +842,7 @@ void handleSwitches() {
       }
     }
   }
-  lastFanReading = reading;
-  
-  // Motor switch
+  lastFanReading = reading;  // Motor switch
   reading = digitalRead(motorSwitchPin);
   if (reading != lastMotorReading) {
     lastMotorDebounceTime = millis();
@@ -904,9 +858,7 @@ void handleSwitches() {
       }
     }
   }
-  lastMotorReading = reading;
-  
-  // Light2 switch
+  lastMotorReading = reading;  // Light2 switch
   reading = digitalRead(light2SwitchPin);
   if (reading != lastLight2Reading) {
     lastLight2DebounceTime = millis();
@@ -924,11 +876,8 @@ void handleSwitches() {
   }
   lastLight2Reading = reading;
 }
-
 void handleLED() {
-  unsigned long now = millis();
-  
-  if (isConnected) {
+  unsigned long now = millis();  if (isConnected) {
     // Pulse: 0.5s ON, 10s OFF
     if (ledPhase == 0) {  // OFF phase
       if (now - ledTimer > 10000) {
@@ -949,17 +898,13 @@ void handleLED() {
       lastBlink = now;
       ledState = !ledState;
       digitalWrite(ledPin, ledState ? LED_ON : LED_OFF);
-    }
-    
-    // Update interval based on state
-    if (isAPMode) {
-      blinkInterval = 500;    // Fast for AP/setup
-    } else {
-      blinkInterval = 3000;   // Medium for disconnected/trying
-    }
-  }
+    }// Update interval based on state
+if (isAPMode) {
+  blinkInterval = 500;    // Fast for AP/setup
+} else {
+  blinkInterval = 3000;   // Medium for disconnected/trying
+}  }
 }
-
 void checkConnection() {
   static bool lastConnected = false;
   if (WiFi.status() == WL_CONNECTED && !isConnected) {
@@ -976,104 +921,58 @@ void checkConnection() {
     lastConnected = isConnected;
   }
 }
-
 void setup() {
   // Initialize serial for debugging (optional, remove if not needed)
   Serial.begin(115200);
-  Serial.println("Starting...");
-
-  // Initialize output pins
+  Serial.println("Starting...");  // Initialize output pins
   pinMode(lightPin, OUTPUT);
   pinMode(fanPin, OUTPUT);
   pinMode(motorPin, OUTPUT);
-  pinMode(light2Pin, OUTPUT);
-  
-  // Initialize input pins
+  pinMode(light2Pin, OUTPUT);  // Initialize input pins
   pinMode(lightSwitchPin, INPUT_PULLUP);
   pinMode(fanSwitchPin, INPUT_PULLUP);
   pinMode(motorSwitchPin, INPUT_PULLUP);
-  pinMode(light2SwitchPin, INPUT_PULLUP);
-  
-  // Initialize switch states
+  pinMode(light2SwitchPin, INPUT_PULLUP);  // Initialize switch states
   lightSwitchState = digitalRead(lightSwitchPin);
   lastLightStable = lightSwitchState;
-  lastLightReading = lightSwitchState;
-  
-  fanSwitchState = digitalRead(fanSwitchPin);
+  lastLightReading = lightSwitchState;  fanSwitchState = digitalRead(fanSwitchPin);
   lastFanStable = fanSwitchState;
-  lastFanReading = fanSwitchState;
-  
-  motorSwitchState = digitalRead(motorSwitchPin);
+  lastFanReading = fanSwitchState;  motorSwitchState = digitalRead(motorSwitchPin);
   lastMotorStable = motorSwitchState;
-  lastMotorReading = motorSwitchState;
-  
-  light2SwitchState = digitalRead(light2SwitchPin);
+  lastMotorReading = motorSwitchState;  light2SwitchState = digitalRead(light2SwitchPin);
   lastLight2Stable = light2SwitchState;
-  lastLight2Reading = light2SwitchState;
-  
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, LED_OFF);
-  
-  // Reset button: internal pullup
-  pinMode(resetPin, INPUT_PULLUP);
-
-  // Initialize EEPROM
-  EEPROM.begin(EEPROM_SIZE);
-  
-  // Load config
-  loadConfig();
-  
-  // Load relay states (default to OFF if uninitialized)
+  lastLight2Reading = light2SwitchState;  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LED_OFF);  // Reset button: internal pullup
+  pinMode(resetPin, INPUT_PULLUP);  // Initialize EEPROM
+  EEPROM.begin(EEPROM_SIZE);  // Load config
+  loadConfig();  // Load relay states (default to OFF if uninitialized)
   byte lightState = EEPROM.read(STATES_ADDR);
   if (lightState > 1) lightState = 0;
-  digitalWrite(lightPin, lightState);
-  
-  byte fanState = EEPROM.read(STATES_ADDR + 1);
+  digitalWrite(lightPin, lightState);  byte fanState = EEPROM.read(STATES_ADDR + 1);
   if (fanState > 1) fanState = 0;
-  digitalWrite(fanPin, fanState);
-  
-  byte motorState = EEPROM.read(STATES_ADDR + 2);
+  digitalWrite(fanPin, fanState);  byte motorState = EEPROM.read(STATES_ADDR + 2);
   if (motorState > 1) motorState = 0;
-  digitalWrite(motorPin, motorState);
-  
-  byte light2State = EEPROM.read(STATES_ADDR + 3);
+  digitalWrite(motorPin, motorState);  byte light2State = EEPROM.read(STATES_ADDR + 3);
   if (light2State > 1) light2State = 0;
-  digitalWrite(light2Pin, light2State);
-  
-  // Try to connect if config exists
+  digitalWrite(light2Pin, light2State);  // Try to connect if config exists
   if (config.hasConfig) {
     Serial.println("Attempting WiFi connection...");
     connectToWiFi();
   } else {
     Serial.println("No config, starting AP mode...");
     startAPMode();
-  }
-  
-  // Setup server handlers
-  setupServer();
-  
-  Serial.println("Setup complete.");
+  }  // Setup server handlers
+  setupServer();  Serial.println("Setup complete.");
 }
-
 void loop() {
   if (isAPMode) {
     dnsServer.processNextRequest();
   }
-  server.handleClient();
-  
-  // Handle physical switches
-  handleSwitches();
-  
-  // Handle reset button long press
-  handleResetButton();
-  
-  // Handle LED
-  handleLED();
-  
-  // Check connection status
-  checkConnection();
-  
-  // Retry connection if has config and not connected
+  server.handleClient();  // Handle physical switches
+  handleSwitches();  // Handle reset button long press
+  handleResetButton();  // Handle LED
+  handleLED();  // Check connection status
+  checkConnection();  // Retry connection if has config and not connected
   if (!isConnected && config.hasConfig && connectAttempts < maxConnectAttempts) {
     static unsigned long lastAttempt = 0;
     if (millis() - lastAttempt > 30000) {  // Every 30s
@@ -1085,7 +984,5 @@ void loop() {
   } else if (!isConnected && config.hasConfig && connectAttempts >= maxConnectAttempts) {
     Serial.println("Max attempts reached, starting AP mode...");
     startAPMode();
-  }
-  
-  delay(10);
+  }  delay(10);
 }
