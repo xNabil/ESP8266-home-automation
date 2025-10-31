@@ -453,8 +453,8 @@ const char* controlPage = R"rawliteral(
                 <input type="password" id="resetPass" placeholder="Current Password" required>
                 <span class="pass-toggle" onclick="toggleThisPass(this)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
             </div>
-             <button type="button" class="reset-btn" onclick="performReset()">Confirm Reset</button>
-            <button type="button" style="background-color: #0096FF; color: #fff; padding: 10px; border: none; border-radius: 5px; cursor: pointer; width: 100%;" onclick="toggleResetConfig()">Cancel</button>
+            <br><button type="button" class="reset-btn" onclick="performReset()">Confirm Reset</button></br>
+            <br><button type="button" style="background-color: #0096FF; color: #fff; padding: 10px; border: none; border-radius: 5px; cursor: pointer; width: 100%;" onclick="toggleResetConfig()">Cancel</button></br>
         </div>
         <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
