@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connecting...</title>
+    <title>Home Automation Control</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
     <style>
         body { 
@@ -15,43 +14,451 @@
             display: flex; 
             flex-direction: column; 
             align-items: center; 
-            justify-content: center;
-            height: 100vh;
         }
         h1 { color: #00ff00; }
-        p { font-size: 18px; }
+        .toggle { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            margin: 10px; 
+        }
+        .toggle label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .toggle-btn { 
+            width: 200px; 
+            height: 60px; 
+            border: none; 
+            border-radius: 30px; 
+            font-size: 18px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: background-color 0.3s; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 10px; 
+        }
+        .off { background-color: #333; color: #fff; }
+        .on { background-color: #00ff00; color: #000; }
+        .status { 
+            margin-top: 20px; 
+            padding: 10px; 
+            border-radius: 10px; 
+            text-align: center; 
+        }
+        .online { background-color: #00ff00; color: #000; }
+        .offline { background-color: #ff0000; color: #fff; }
+        #configSection { 
+            margin-top: 30px; 
+            padding: 20px; 
+            background-color: #111; 
+            border-radius: 10px; 
+            width: 300px; 
+        }
+        input { 
+            width: 100%; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border: none; 
+            border-radius: 5px; 
+            background-color: #333; 
+            color: #fff; 
+            box-sizing: border-box;
+        }
+        button[type="submit"] { 
+            background-color: #00ff00; 
+            color: #000; 
+            padding: 10px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            width: 100%; 
+        }
+        .reset-btn { 
+            background-color: #ff0000; 
+            color: #fff; 
+            padding: 10px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin-top: 10px; 
+            width: 100%; 
+        }
+        .config-btn { 
+            background-color: #00ff00; 
+            color: #000; 
+            padding: 10px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin-top: 10px; 
+            width: 100%; 
+        }
+        /* Icons using Unicode */
+        .icon { font-size: 20px; }
+        #menuBtn {
+            position: fixed;
+            left: 20px;
+            top: 20px;
+            background: none;
+            border: none;
+            font-size: 30px;
+            color: #fff;
+            cursor: pointer;
+            display: none;
+            z-index: 2;
+        }
+        #sidebar {
+            position: fixed;
+            left: -250px;
+            top: 0;
+            width: 250px;
+            height: 100%;
+            background: #111;
+            transition: left 0.3s;
+            padding: 60px 20px 20px 20px;
+            box-sizing: border-box;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #sidebar h2 {
+            color: #00ff00;
+        }
+        .password-container {
+            position: relative;
+            width: 100%;
+        }
+        .password-container input {
+            width: 100%;
+            box-sizing: border-box;
+            margin: 10px 0;
+        }
+        .password-container span {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            font-size: 18px;
+        }
+        .edit-pen {
+            display: none;
+            font-size: 20px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        body.edit-mode .edit-pen {
+            display: inline;
+        }
+        #editModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #111;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 3;
+            color: #fff;
+        }
+        #editModal input {
+            background: #333;
+            color: #fff;
+        }
+        #editModal button {
+            margin: 10px 5px 0 0;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #editModal #saveBtn {
+            background: #00ff00;
+            color: #000;
+        }
+        #editModal #cancelBtn {
+            background: #ff0000;
+            color: #fff;
+        }
+        #sidebar-spacer {
+            flex-grow: 1;
+        }
     </style>
 </head>
 <body>
-    <h1>Connecting to WiFi...</h1>
-    <p>Please wait while we connect to your network.</p>
-    <div id="popup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#111; color:#fff; padding:20px; border-radius:10px; text-align:center; z-index:10;">
-        <p>Connected! Visit <a id="ipLink" href="#" style="color:#00ff00;" target="_blank"></a> to control the device.<br>AP will turn off automatically in 10 seconds.</p>
+    <button id="menuBtn">☰</button>
+    <div id="sidebar">
+        <h2>Settings</h2>
+        <button class="config-btn" id="wifiBtn" onclick="toggleWifiConfig()">WiFi Configuration</button>
+        <div id="wifiConfigForm" style="display: none;">
+            <form action="/save" method="POST">
+                <input type="text" name="ssid" placeholder="WiFi SSID" required>
+                <div class="password-container">
+                    <input type="password" id="password" name="password" placeholder="WiFi Password">
+                    <span id="togglePassword">👁️</span>
+                </div>
+                <input type="text" name="staticIP" placeholder="Static IP (e.g., 192.168.1.100, optional)">
+                <button type="submit">Save & Reboot</button>
+            </form>
+        </div>
+        <div id="sidebar-spacer"></div>
+        <button class="reset-btn" onclick="resetConfig()">Factory Reset</button>
     </div>
-    <script>
-        let interval = setInterval(() => {
-            fetch('/status')
+    <h1>Quickstart Device</h1>
+    
+<div class="toggle">
+    <label>Light</label>
+    <button class="toggle-btn off" id="lightBtn" onclick="toggle('light')">
+        <span class="icon"></span> OFF
+    </button>
+</div>
+
+<div class="toggle">
+    <label>Light-2</label>
+    <button class="toggle-btn off" id="light2Btn" onclick="toggle('light2')">
+        <span class="icon"></span> OFF
+    </button>
+</div>
+
+<div class="toggle">
+    <label>Fan</label>
+    <button class="toggle-btn off" id="fanBtn" onclick="toggle('fan')">
+        <span class="icon"></span> OFF
+    </button>
+</div>
+
+<div class="toggle">
+    <label>Motor</label>
+    <button class="toggle-btn off" id="motorBtn" onclick="toggle('motor')">
+        <span class="icon"></span> OFF
+    </button>
+</div>
+
+<div id="status" class="status offline">Device is offline</div>
+
+<div id="editModal">
+    <h3>Edit Device</h3>
+    <input id="newName" placeholder="Rename Title">
+    <input id="newIcon" placeholder="Change icon (emoji)">
+    <button id="saveBtn" onclick="saveEdit()">Save</button>
+    <button id="cancelBtn" onclick="cancelEdit()">Cancel</button>
+</div>
+
+<script>
+    let customs = [];
+    let currentIdx = -1;
+    let isEditMode = false;
+    let pressTimer;
+
+    function loadCustoms() {
+        fetch('/get_custom')
+            .then(response => response.json())
+            .then(data => {
+                customs = data;
+                updateLabelsAndButtons();
+                addPens();
+            });
+    }
+
+    function updateLabelsAndButtons() {
+        const pins = ['light', 'light2', 'fan', 'motor'];
+        const labels = document.querySelectorAll('.toggle label');
+        pins.forEach((pin, idx) => {
+            if (labels[idx].firstChild.nodeType === Node.TEXT_NODE) {
+                labels[idx].firstChild.textContent = customs[idx].name;
+            }
+            const btn = document.getElementById(pin + 'Btn');
+            const state = btn.classList.contains('on') ? 'ON' : 'OFF';
+            btn.innerHTML = '<span class="icon">' + customs[idx].icon + '</span> ' + state;
+        });
+    }
+
+    function addPens() {
+        const labels = document.querySelectorAll('.toggle label');
+        const pins = ['light', 'light2', 'fan', 'motor'];
+        labels.forEach((lab, idx) => {
+            if (!lab.querySelector('.edit-pen')) {
+                const textNode = document.createTextNode(customs[idx].name || pins[idx].charAt(0).toUpperCase() + pins[idx].slice(1));
+                lab.innerHTML = ''; // clear
+                lab.appendChild(textNode);
+                let pen = document.createElement('span');
+                pen.className = 'edit-pen';
+                pen.innerHTML = '✏️';
+                pen.onclick = () => editDevice(idx);
+                lab.appendChild(pen);
+            }
+        });
+    }
+
+    function editDevice(idx) {
+        currentIdx = idx;
+        document.getElementById('newName').value = customs[idx].name;
+        document.getElementById('newIcon').value = customs[idx].icon;
+        document.getElementById('editModal').style.display = 'block';
+    }
+
+    function saveEdit() {
+        const newName = document.getElementById('newName').value;
+        const newIcon = document.getElementById('newIcon').value;
+        fetch(`/save_device?idx=${currentIdx}&name=${encodeURIComponent(newName)}&icon=${encodeURIComponent(newIcon)}`)
+            .then(() => {
+                customs[currentIdx].name = newName;
+                customs[currentIdx].icon = newIcon;
+                updateLabelsAndButtons();
+                cancelEdit();
+            });
+    }
+
+    function cancelEdit() {
+        document.getElementById('editModal').style.display = 'none';
+    }
+
+    function updateStatus() {
+        fetch('/status')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('status').innerHTML = data.connected ? 'Device is online' : 'Device is offline';
+                document.getElementById('status').className = 'status ' + (data.connected ? 'online' : 'offline');
+                document.getElementById('menuBtn').style.display = 'block';
+                if (data.connected) {
+                    document.getElementById('wifiBtn').style.display = 'block';
+                    var sidebar = document.getElementById('sidebar');
+                    if (sidebar.style.left !== '0px') {
+                        document.getElementById('wifiConfigForm').style.display = 'none';
+                    }
+                } else {
+                    document.getElementById('wifiBtn').style.display = 'block';
+                    var sidebar = document.getElementById('sidebar');
+                    if (sidebar.style.left !== '0px') {
+                        document.getElementById('wifiConfigForm').style.display = 'none';
+                    }
+                }
+                // Update toggles
+                const pins = ['light', 'light2', 'fan', 'motor'];
+                pins.forEach((pin, idx) => {
+                    const btn = document.getElementById(pin + 'Btn');
+                    const state = data[pin];
+                    btn.innerHTML = '<span class="icon">' + (customs[idx] ? customs[idx].icon : getDefaultIcon(pin)) + '</span> ' + (state ? 'ON' : 'OFF');
+                    btn.className = 'toggle-btn ' + (state ? 'on' : 'off');
+                });
+            });
+    }
+    
+    function getDefaultIcon(pin) {
+        if (pin === 'light' || pin === 'light2') return '💡';
+        if (pin === 'fan') return '🌀';
+        if (pin === 'motor') return '⚙️';
+        return '';
+    }
+    
+    function toggle(pin) {
+        const currentState = document.getElementById(pin + 'Btn').classList.contains('on');
+        const newState = !currentState ? 1 : 0;
+        fetch('/set?pin=' + pin + '&state=' + newState)
+            .then(() => updateStatus());
+    }
+    
+    function resetConfig() {
+        if (confirm('Are you sure? This will clear WiFi settings and reboot.')) {
+            fetch('/clear')
+                .then(() => location.reload());
+        }
+    }
+    
+    function toggleWifiConfig() {
+        let form = document.getElementById('wifiConfigForm');
+        if (form.style.display === 'none' || form.style.display === '') {
+            form.style.display = 'block';
+            fetch('/get_config')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.connected && data.ip && data.ip !== '0.0.0.0') {
-                        let ipUrl = 'http://' + data.ip;
-                        document.getElementById('ipLink').href = ipUrl;
-                        document.getElementById('ipLink').textContent = ipUrl;
-                        document.getElementById('popup').style.display = 'block';
-                        clearInterval(interval);
-                        setTimeout(() => {
-                            finishSetup();
-                        }, 10000);
-                    }
+                    document.querySelector('#wifiConfigForm input[name="ssid"]').value = data.ssid;
+                    document.querySelector('#wifiConfigForm input[name="staticIP"]').value = data.staticIP;
                 });
-        }, 2000);
-
-        function finishSetup() {
-            fetch('/finish_setup')
-                .then(() => {
-                    alert('AP will stop now. Please connect to your home WiFi and visit the provided IP.');
-                });
+        } else {
+            form.style.display = 'none';
         }
-    </script>
-</body>
+    }
+    
+    document.getElementById('menuBtn').addEventListener('click', function() {
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar.style.left === '0px') {
+            sidebar.style.left = '-250px';
+        } else {
+            sidebar.style.left = '0px';
+        }
+    });
+    
+    document.getElementById('togglePassword').addEventListener('click', function() {
+        var password = document.getElementById('password');
+        if (password.type === 'password') {
+            password.type = 'text';
+            this.innerHTML = '👁️';
+        } else {
+            password.type = 'password';
+            this.innerHTML = '🙈';
+        }
+    });
+
+    // Long press detection
+    document.body.addEventListener('mousedown', function(e) {
+        if (e.target === document.body) {
+            pressTimer = window.setTimeout(toggleEditMode, 2000);
+        }
+    });
+
+    document.body.addEventListener('mouseup', function() {
+        clearTimeout(pressTimer);
+    });
+
+    document.body.addEventListener('touchstart', function(e) {
+        if (e.target === document.body) {
+            pressTimer = window.setTimeout(toggleEditMode, 2000);
+        }
+    }, {passive: false});
+
+    document.body.addEventListener('touchend', function() {
+        clearTimeout(pressTimer);
+    });
+
+    function toggleEditMode() {
+        isEditMode = !isEditMode;
+        if (isEditMode) {
+            document.body.classList.add('edit-mode');
+            // Create and insert cancel button
+            let cancelBtn = document.createElement('button');
+            cancelBtn.id = 'cancelEditMode';
+            cancelBtn.textContent = 'Cancel Edit Mode';
+            cancelBtn.style.backgroundColor = '#ff0000';
+            cancelBtn.style.color = '#fff';
+            cancelBtn.style.padding = '10px';
+            cancelBtn.style.border = 'none';
+            cancelBtn.style.borderRadius = '5px';
+            cancelBtn.style.cursor = 'pointer';
+            cancelBtn.style.marginBottom = '10px';
+            cancelBtn.style.width = '200px';
+            cancelBtn.onclick = toggleEditMode;
+            let statusDiv = document.getElementById('status');
+            statusDiv.parentNode.insertBefore(cancelBtn, statusDiv);
+        } else {
+            document.body.classList.remove('edit-mode');
+            // Remove cancel button
+            let cancelBtn = document.getElementById('cancelEditMode');
+            if (cancelBtn) {
+                cancelBtn.remove();
+            }
+        }
+        updateLabelsAndButtons();
+    }
+    
+    // Update on load and every 5s
+    updateStatus();
+    loadCustoms();
+    setInterval(updateStatus, 5000);
+</script></body>
 </html>
