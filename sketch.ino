@@ -445,8 +445,17 @@ const char* controlPage = R"rawliteral(
                 <button type="submit">Save</button>
             </form>
         </div>
+        <button class="reset-btn" id="resetBtn" onclick="toggleResetConfig()">Factory Reset</button>
+        <div id="resetConfigForm" style="display: none;">
+            <form action="/clear" method="POST">
+                <div class="password-container">
+                    <input type="password" name="currentPass" placeholder="Enter Current Password" required>
+                    <span class="pass-toggle" onclick="toggleThisPass(this)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                </div>
+                <button type="submit">Factory Reset</button>
+            </form>
+        </div>
         <div id="sidebar-spacer"></div>
-        <button class="reset-btn" onclick="resetConfig()">Factory Reset</button>
         <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
     <h1>HomeIQ</h1>
@@ -498,6 +507,11 @@ const char* controlPage = R"rawliteral(
 
     document.addEventListener('click', () => { lastUserActivity = Date.now(); });
     document.addEventListener('touchstart', () => { lastUserActivity = Date.now(); });
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('loginerror') || params.get('reseterror')) {
+        alert('Wrong password!');
+    }
 
     function loadCustoms() {
         fetch('/get_custom')
@@ -637,6 +651,15 @@ const char* controlPage = R"rawliteral(
 
     function toggleLoginConfig() {
         let form = document.getElementById('loginConfigForm');
+        if (form.style.display === 'none' || form.style.display === '') {
+            form.style.display = 'block';
+        } else {
+            form.style.display = 'none';
+        }
+    }
+
+    function toggleResetConfig() {
+        let form = document.getElementById('resetConfigForm');
         if (form.style.display === 'none' || form.style.display === '') {
             form.style.display = 'block';
         } else {
@@ -1058,13 +1081,19 @@ void setupServer() {
     isAPMode = false;
     dnsServer.stop();
   });  // Clear config (factory reset)
-  server.on("/clear", []() {
+  server.on("/clear", HTTP_POST, []() {
     if(!isAuthenticated()) {
       server.sendHeader("Location", "/");
       server.send(302, "text/plain", "");
       return;
     }
-    clearConfigAndRestart();
+    String currentPass = server.arg("currentPass");
+    if (currentPass == String(config.loginPassword)) {
+      clearConfigAndRestart();
+    } else {
+      server.sendHeader("Location", "/?reseterror=1");
+      server.send(302);
+    }
   });  // Get custom device names and icons
   server.on("/get_custom", []() {
     if(!isAuthenticated()) {
