@@ -49,6 +49,8 @@ struct Config {
   bool hasConfig;
   char deviceNames[4][32];
   char deviceIcons[4][16];
+  char loginPassword[32];
+  bool persistentLogin;
 };
 Config config;
 const int STATES_ADDR = sizeof(Config);
@@ -74,6 +76,121 @@ const int maxConnectAttempts = 20;  // ~10 min at 30s intervals
 unsigned long pressStart = 0;
 const unsigned long resetHoldTime = 3000;  // 3 seconds
 // HTML and CSS (hardcoded for simplicity, no SPIFFS needed)
+const char* loginPage = R"rawliteral(
+<!DOCTYPE html><html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Home Automation</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background-color: #000; 
+            color: #fff; 
+            margin: 0; 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            height: 100vh;
+        }
+        h1 { color: #0096FF; text-align: center; }
+        #loginForm { 
+            background-color: #111; 
+            padding: 20px; 
+            border-radius: 10px; 
+            width: 300px; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        input { 
+            width: 100%; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border: none; 
+            border-radius: 5px; 
+            background-color: #333; 
+            color: #fff; 
+            box-sizing: border-box;
+        }
+        button[type="submit"] { 
+            background-color: #0096FF; 
+            color: #000; 
+            padding: 10px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            width: 100%; 
+            margin-top: 10px;
+        }
+        .password-container {
+            position: relative;
+            width: 100%;
+        }
+        .password-container input {
+            width: 100%;
+            box-sizing: border-box;
+            margin: 10px 0;
+        }
+        .password-container span {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            font-size: 18px;
+        }
+        label {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        #errorMsg { 
+            color: #ff0000; 
+            margin-bottom: 10px; 
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Login</h1>
+    <div id="errorMsg">Wrong credentials!</div>
+    <form id="loginForm" method="POST" action="/login">
+        <div class="password-container">
+            <input type="password" name="password" id="passInput" placeholder="Password" required>
+            <span id="togglePassword">👁️</span>
+        </div>
+        <label>
+            <input type="checkbox" name="remember"> Keep me logged in
+        </label>
+        <button type="submit">Login</button>
+    </form>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('error')) {
+            document.getElementById('errorMsg').style.display = 'block';
+        }
+        document.getElementById('togglePassword').addEventListener('click', function() {
+            var pass = document.getElementById('passInput');
+            if (pass.type === 'password') {
+                pass.type = 'text';
+                this.innerHTML = '🙈';
+            } else {
+                pass.type = 'password';
+                this.innerHTML = '👁️';
+            }
+        });
+    </script>
+</body>
+</html>
+)rawliteral";
+
 const char* controlPage = R"rawliteral(
 <!DOCTYPE html><html lang="en">
 <head>
@@ -92,7 +209,7 @@ const char* controlPage = R"rawliteral(
             flex-direction: column; 
             align-items: center; 
         }
-        h1 { color: #00ff00; }
+        h1 { color: #0096FF; }
         .toggle { 
             display: flex; 
             flex-direction: column; 
@@ -119,14 +236,14 @@ const char* controlPage = R"rawliteral(
             gap: 10px; 
         }
         .off { background-color: #333; color: #fff; }
-        .on { background-color: #00ff00; color: #000; }
+        .on { background-color: #0096FF; color: #000; }
         .status { 
             margin-top: 20px; 
             padding: 10px; 
             border-radius: 10px; 
             text-align: center; 
         }
-        .online { background-color: #00ff00; color: #000; }
+        .online { background-color: #0096FF; color: #000; }
         .offline { background-color: #ff0000; color: #fff; }
         #configSection { 
             margin-top: 30px; 
@@ -146,7 +263,7 @@ const char* controlPage = R"rawliteral(
             box-sizing: border-box;
         }
         button[type="submit"] { 
-            background-color: #00ff00; 
+            background-color: #0096FF; 
             color: #000; 
             padding: 10px; 
             border: none; 
@@ -164,8 +281,18 @@ const char* controlPage = R"rawliteral(
             margin-top: 10px; 
             width: 100%; 
         }
+        .logout-btn { 
+            background-color: #ff0000; 
+            color: #fff; 
+            padding: 10px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin-top: 10px; 
+            width: 100%; 
+        }
         .config-btn { 
-            background-color: #00ff00; 
+            background-color: #0096FF; 
             color: #000; 
             padding: 10px; 
             border: none; 
@@ -203,7 +330,7 @@ const char* controlPage = R"rawliteral(
             flex-direction: column;
         }
         #sidebar h2 {
-            color: #00ff00;
+            color: #0096FF;
         }
         .password-container {
             position: relative;
@@ -215,6 +342,14 @@ const char* controlPage = R"rawliteral(
             margin: 10px 0;
         }
         .password-container span {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            font-size: 18px;
+        }
+        .pass-toggle {
             position: absolute;
             right: 10px;
             top: 50%;
@@ -255,7 +390,7 @@ const char* controlPage = R"rawliteral(
             cursor: pointer;
         }
         #editModal #saveBtn {
-            background: #00ff00;
+            background: #0096FF;
             color: #000;
         }
         #editModal #cancelBtn {
@@ -283,10 +418,25 @@ const char* controlPage = R"rawliteral(
                 <button type="submit">Save & Reboot</button>
             </form>
         </div>
+        <button class="config-btn" id="loginBtn" onclick="toggleLoginConfig()">Login Configuration</button>
+        <div id="loginConfigForm" style="display: none;">
+            <form action="/save_login" method="POST">
+                <div class="password-container">
+                    <input type="password" name="currentPass" placeholder="Enter Current Password" required>
+                    <span class="pass-toggle" onclick="toggleThisPass(this)">👁️</span>
+                </div>
+                <div class="password-container">
+                    <input type="password" name="newPass" placeholder="New Login Password" required>
+                    <span class="pass-toggle" onclick="toggleThisPass(this)">👁️</span>
+                </div>
+                <button type="submit">Save</button>
+            </form>
+        </div>
         <div id="sidebar-spacer"></div>
         <button class="reset-btn" onclick="resetConfig()">Factory Reset</button>
+        <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
-    <h1>Quickstart Device</h1>
+    <h1>HomeIQ</h1>
     
 <div class="toggle">
     <label>Light</label>
@@ -331,6 +481,10 @@ const char* controlPage = R"rawliteral(
     let currentIdx = -1;
     let isEditMode = false;
     let pressTimer;
+    let lastUserActivity = Date.now();
+
+    document.addEventListener('click', () => { lastUserActivity = Date.now(); });
+    document.addEventListener('touchstart', () => { lastUserActivity = Date.now(); });
 
     function loadCustoms() {
         fetch('/get_custom')
@@ -399,6 +553,12 @@ const char* controlPage = R"rawliteral(
         fetch('/status')
             .then(response => response.json())
             .then(data => {
+                if (!data.persistent && (Date.now() - lastUserActivity > 30000)) {
+                    fetch('/logout').then(() => {
+                        window.location.href = '/';
+                    });
+                    return;
+                }
                 document.getElementById('status').innerHTML = data.connected ? 'Device is online' : 'Device is offline';
                 document.getElementById('status').className = 'status ' + (data.connected ? 'online' : 'offline');
                 document.getElementById('menuBtn').style.display = 'block';
@@ -459,6 +619,32 @@ const char* controlPage = R"rawliteral(
                 });
         } else {
             form.style.display = 'none';
+        }
+    }
+
+    function toggleLoginConfig() {
+        let form = document.getElementById('loginConfigForm');
+        if (form.style.display === 'none' || form.style.display === '') {
+            form.style.display = 'block';
+        } else {
+            form.style.display = 'none';
+        }
+    }
+
+    function toggleThisPass(span) {
+        let input = span.parentElement.querySelector('input');
+        if (input.type === 'password') {
+            input.type = 'text';
+            span.innerHTML = '🙈';
+        } else {
+            input.type = 'password';
+            span.innerHTML = '👁️';
+        }
+    }
+
+    function logout() {
+        if (confirm('Are you sure you want to log out?')) {
+            window.location.href = '/logout';
         }
     }
     
@@ -561,7 +747,7 @@ const char* connectPage = R"rawliteral(
             justify-content: center;
             height: 100vh;
         }
-        h1 { color: #00ff00; }
+        h1 { color: #0096FF; }
         p { font-size: 18px; }
     </style>
 </head>
@@ -569,7 +755,7 @@ const char* connectPage = R"rawliteral(
     <h1>Connecting to WiFi...</h1>
     <p>Please wait while we connect to your network.</p>
     <div id="popup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#111; color:#fff; padding:20px; border-radius:10px; text-align:center; z-index:10;">
-        <p>Connected! Visit <a id="ipLink" href="#" style="color:#00ff00;" target="_blank"></a> to control the device.
+        <p>Connected! Visit <a id="ipLink" href="#" style="color:#0096FF;" target="_blank"></a> to control the device.
 AP will turn off automatically in 10 seconds.</p>
     </div>
     <script>
@@ -600,6 +786,12 @@ AP will turn off automatically in 10 seconds.</p>
 </html>
 )rawliteral";
 
+bool isAuthenticated() {
+  String cookieStr = server.header("Cookie");
+  bool cookieAuth = (cookieStr.indexOf("auth=valid") != -1);
+  return config.persistentLogin || cookieAuth;
+}
+
 String toStringIp(IPAddress ip) {
   return String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
 }
@@ -612,6 +804,8 @@ void setDefaults() {
   strcpy(config.deviceIcons[1], "💡");
   strcpy(config.deviceIcons[2], "🌀");
   strcpy(config.deviceIcons[3], "⚙️");
+  strcpy(config.loginPassword, "user");
+  config.persistentLogin = false;
 }
 void saveStates() {
   EEPROM.write(STATES_ADDR, digitalRead(lightPin));
@@ -630,6 +824,9 @@ void loadConfig() {
   }
   if (strlen(config.deviceNames[0]) == 0) {
     setDefaults();
+  }
+  if (strlen(config.loginPassword) == 0) {
+    strcpy(config.loginPassword, "user");
   }
 }
 void saveConfig() {
@@ -696,17 +893,28 @@ void handleResetButton() {
 void setupServer() {
   // Status endpoint
   server.on("/status", []() {
+    if(!isAuthenticated()) {
+      server.sendHeader("Location", "/");
+      server.send(302, "text/plain", "");
+      return;
+    }
     String json = "{";
     json += "\"connected\":" + String(isConnected ? "true" : "false") + ",";
     json += "\"ip\":\"" + (isConnected ? WiFi.localIP().toString() : "0.0.0.0") + "\",";
     json += "\"light\":" + String(digitalRead(lightPin)) + ",";
     json += "\"light2\":" + String(digitalRead(light2Pin)) + ",";
     json += "\"fan\":" + String(digitalRead(fanPin)) + ",";
-    json += "\"motor\":" + String(digitalRead(motorPin));
+    json += "\"motor\":" + String(digitalRead(motorPin)) + ",";
+    json += "\"persistent\":" + String(config.persistentLogin ? "true" : "false");
     json += "}";
     server.send(200, "application/json; charset=utf-8", json);
   });  // Get config endpoint (without password)
   server.on("/get_config", []() {
+    if(!isAuthenticated()) {
+      server.sendHeader("Location", "/");
+      server.send(302, "text/plain", "");
+      return;
+    }
     String json = "{";
     json += "\"ssid\":\"" + String(config.ssid) + "\",";
     json += "\"staticIP\":\"" + String(config.staticIP) + "\"";
@@ -714,6 +922,11 @@ void setupServer() {
     server.send(200, "application/json; charset=utf-8", json);
   });  // Set endpoint
   server.on("/set", []() {
+    if(!isAuthenticated()) {
+      server.sendHeader("Location", "/");
+      server.send(302, "text/plain", "");
+      return;
+    }
     if (server.hasArg("pin") && server.hasArg("state")) {
       String pin = server.arg("pin");
       int state = server.arg("state").toInt();
@@ -726,8 +939,59 @@ void setupServer() {
     } else {
       server.send(400, "text/plain; charset=utf-8", "Bad Request");
     }
+  });  // Login endpoint
+  server.on("/login", HTTP_POST, []() {
+    String pass = server.arg("password");
+    String rem = server.arg("remember");
+    bool remember = (rem == "on" || rem == "1");
+    if (pass == String(config.loginPassword)) {
+      if (remember) {
+        config.persistentLogin = true;
+        saveConfig();
+        server.sendHeader("Set-Cookie", "auth=valid; Path=/; Max-Age=31536000; HttpOnly");
+      } else {
+        server.sendHeader("Set-Cookie", "auth=valid; Path=/; HttpOnly");
+      }
+      server.sendHeader("Location", "/");
+      server.send(302);
+    } else {
+      server.sendHeader("Location", "/?error=1");
+      server.send(302);
+    }
+  });  // Logout endpoint
+  server.on("/logout", []() {
+    config.persistentLogin = false;
+    saveConfig();
+    server.sendHeader("Set-Cookie", "auth=; Path=/; Max-Age=0; HttpOnly");
+    server.sendHeader("Location", "/");
+    server.send(302);
+  });  // Save login password
+  server.on("/save_login", HTTP_POST, []() {
+    if(!isAuthenticated()) {
+      server.sendHeader("Location", "/");
+      server.send(302, "text/plain", "");
+      return;
+    }
+    String currentPass = server.arg("currentPass");
+    String newPass = server.arg("newPass");
+    if (currentPass == String(config.loginPassword)) {
+      strncpy(config.loginPassword, newPass.c_str(), 31);
+      config.loginPassword[31] = '\0';
+      config.persistentLogin = false;
+      saveConfig();
+      server.sendHeader("Location", "/");
+      server.send(302);
+    } else {
+      server.sendHeader("Location", "/?loginerror=1");
+      server.send(302);
+    }
   });  // Save config
   server.on("/save", HTTP_POST, []() {
+    if(!isAuthenticated()) {
+      server.sendHeader("Location", "/");
+      server.send(302, "text/plain", "");
+      return;
+    }
     if (server.hasArg("ssid")) {
       strncpy(config.ssid, server.arg("ssid").c_str(), 31);
       config.ssid[31] = '\0';
@@ -742,6 +1006,7 @@ void setupServer() {
     }
     config.hasConfig = true;
     saveConfig();
+    server.sendHeader("Set-Cookie", "auth=valid; Path=/; HttpOnly");
     // Start connecting while keeping AP on
     WiFi.mode(WIFI_AP_STA);
     if (strlen(config.staticIP) > 0) {
@@ -762,15 +1027,30 @@ void setupServer() {
     // Handle file upload if needed, but not used here
   });  // Finish setup endpoint
   server.on("/finish_setup", []() {
+    if(!isAuthenticated()) {
+      server.sendHeader("Location", "/");
+      server.send(302, "text/plain", "");
+      return;
+    }
     server.send(200, "text/plain; charset=utf-8", "OK");
     WiFi.mode(WIFI_STA);
     isAPMode = false;
     dnsServer.stop();
   });  // Clear config (factory reset)
   server.on("/clear", []() {
+    if(!isAuthenticated()) {
+      server.sendHeader("Location", "/");
+      server.send(302, "text/plain", "");
+      return;
+    }
     clearConfigAndRestart();
   });  // Get custom device names and icons
   server.on("/get_custom", []() {
+    if(!isAuthenticated()) {
+      server.sendHeader("Location", "/");
+      server.send(302, "text/plain", "");
+      return;
+    }
     String json = "[";
     for (int i = 0; i < 4; i++) {
       json += "{\"name\":\"" + String(config.deviceNames[i]) + "\",\"icon\":\"" + String(config.deviceIcons[i]) + "\"}";
@@ -780,6 +1060,11 @@ void setupServer() {
     server.send(200, "application/json; charset=utf-8", json);
   });  // Save device custom
   server.on("/save_device", []() {
+    if(!isAuthenticated()) {
+      server.sendHeader("Location", "/");
+      server.send(302, "text/plain", "");
+      return;
+    }
     if (server.hasArg("idx") && server.hasArg("name") && server.hasArg("icon")) {
       int idx = server.arg("idx").toInt();
       if (idx >= 0 && idx < 4) {
@@ -797,7 +1082,11 @@ void setupServer() {
     }
   });  // Root - control/setup page
   server.on("/", []() {
-    server.send(200, "text/html; charset=utf-8", controlPage);
+    if (isAuthenticated()) {
+      server.send(200, "text/html; charset=utf-8", controlPage);
+    } else {
+      server.send(200, "text/html; charset=utf-8", loginPage);
+    }
   });  // Captive portal redirects
   server.on("/generate_204", []() {  // Android
     server.sendHeader("Location", String("http://") + toStringIp(server.client().localIP()), true);
