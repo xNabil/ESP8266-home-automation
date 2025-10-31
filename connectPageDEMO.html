@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connecting...</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background-color: #000; 
+            color: #fff; 
+            margin: 0; 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            height: 100vh;
+        }
+        h1 { color: #00ff00; }
+        p { font-size: 18px; }
+    </style>
+</head>
+<body>
+    <h1>Connecting to WiFi...</h1>
+    <p>Please wait while we connect to your network.</p>
+    <div id="popup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#111; color:#fff; padding:20px; border-radius:10px; text-align:center; z-index:10;">
+        <p>Connected! Visit <a id="ipLink" href="#" style="color:#00ff00;" target="_blank"></a> to control the device.<br>AP will turn off automatically in 10 seconds.</p>
+    </div>
+    <script>
+        let interval = setInterval(() => {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.connected && data.ip && data.ip !== '0.0.0.0') {
+                        let ipUrl = 'http://' + data.ip;
+                        document.getElementById('ipLink').href = ipUrl;
+                        document.getElementById('ipLink').textContent = ipUrl;
+                        document.getElementById('popup').style.display = 'block';
+                        clearInterval(interval);
+                        setTimeout(() => {
+                            finishSetup();
+                        }, 10000);
+                    }
+                });
+        }, 2000);
+
+        function finishSetup() {
+            fetch('/finish_setup')
+                .then(() => {
+                    alert('AP will stop now. Please connect to your home WiFi and visit the provided IP.');
+                });
+        }
+    </script>
+</body>
+</html>
